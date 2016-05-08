@@ -1,0 +1,4 @@
+Negative
+Rotation 10°
+Translation 10px left, 4px up
+Tampon
