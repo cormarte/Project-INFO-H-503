@@ -8,7 +8,7 @@ using namespace std;
 
 unsigned int* cpuHistogram1D(const unsigned char* image, const int width, const int height) {
 
-	unsigned int* histogram = new unsigned int[256]{0};
+	unsigned int* histogram = new unsigned int[256]();
 
 	for (int y = 0; y != height; y++) {
 	
@@ -23,13 +23,13 @@ unsigned int* cpuHistogram1D(const unsigned char* image, const int width, const 
 
 unsigned int* cpuHistogram2D(const unsigned char* image1, const unsigned char* image2, const int width, const int height) {
 
-	auto histogram = new unsigned int[256 * 256]();
+	unsigned int* histogram = new unsigned int[256 * 256]();
 
 	for (int y = 0; y != height; y++) {
 
 		for (int x = 0; x != width; x++) {
 
-			histogram[ image1[x + width*y] + 256 * image2[x + width*y] ]++;
+			histogram[ image1[x + width * y] + 256 * image2[x + width * y] ]++;
 		}
 	}
 
@@ -47,12 +47,16 @@ int main(int argc, char* argv[]) {
 	cout << "Image 2 : width: " << width2 << ", height: " << height2 << endl;
 
 	// Histogram
-	unsigned int* histogram = cpuHistogram1D(image1, width1, height1);
+	unsigned int* histogram1D = cpuHistogram1D(image1, width1, height1);
+	unsigned int* histogram2D = cpuHistogram2D(image1, image2, width1, height1);
+
+	cout << histogram2D[image1[40 + width1 * 0] + 256 * image2[40 + width2 * 0]] << endl;
 
 	// Memory free
 	stbi_image_free(image1);
 	stbi_image_free(image2);
-	delete histogram;
+	delete histogram1D;
+	delete histogram2D;
 
 	// Prompt to end
 	int end;

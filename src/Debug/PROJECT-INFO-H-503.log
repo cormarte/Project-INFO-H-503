@@ -1,10 +1,16 @@
-﻿Build started 08/05/2016 03:39:30.
-     1>Project "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\PROJECT-INFO-H-503.vcxproj" on node 2 (Build target(s)).
-     1>AddCudaCompileDeps:
+﻿Build started 08/05/2016 04:14:03.
+     1>Project "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\PROJECT-INFO-H-503.vcxproj" on node 2 (Rebuild target(s)).
+     1>CudaClean:
+         cmd.exe /C "C:\Users\Corentin\AppData\Local\Temp\tmp2ba5eeeb9a20412c895ffbba6b8b0f28.cmd"
+         "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\stb_image-2.12\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile   -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\histogram.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\histogram.cu" -clean
+         
+         D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\stb_image-2.12\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile   -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\histogram.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\histogram.cu" -clean 
+         histogram.cu
+       AddCudaCompileDeps:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\cl.exe /E /nologo /showIncludes /TP /D__CUDACC__ /DWIN32 /D_DEBUG /D_CONSOLE /D_MBCS /I..\libs\stb_image-2.12\include /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I. /FIcuda_runtime.h /c "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\histogram.cu" 
        CudaBuild:
          Compiling CUDA source file histogram.cu...
-         cmd.exe /C "C:\Users\Corentin\AppData\Local\Temp\tmpc25d960fe1594f34b4740be739d09d41.cmd"
+         cmd.exe /C "C:\Users\Corentin\AppData\Local\Temp\tmp9e8bc703844e40a28c14135bbf37202c.cmd"
          "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\stb_image-2.12\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\histogram.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\histogram.cu"
          
          D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\stb_image-2.12\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\histogram.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\histogram.cu" 
@@ -24,8 +30,8 @@
          C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\cudart32_75.dll
          C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\cudart64_75.dll
                  2 fichier(s) copié(s).
-     1>Done Building Project "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\PROJECT-INFO-H-503.vcxproj" (Build target(s)).
+     1>Done Building Project "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\PROJECT-INFO-H-503.vcxproj" (Rebuild target(s)).
 
 Build succeeded.
 
-Time Elapsed 00:00:09.04
+Time Elapsed 00:00:09.95
