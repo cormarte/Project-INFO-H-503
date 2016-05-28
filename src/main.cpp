@@ -4,14 +4,9 @@
 #include <string>
 #include <stb_image.h>
 
+#include "gpu.h"
+
 using namespace std;
-
-struct Image {
-
-	int width;
-	int height;
-	unsigned char* pixels;
-};
 
 template<typename HistogramType, int histogramSize>
 HistogramType* cpuHistogram1D(const Image& image) {
@@ -52,20 +47,57 @@ HistogramType* cpuHistogram2D(const Image& imageF, const Image& imageR) {
 }
 
 template<typename HistogramType, int histogramSize>
-double cpuMutualInformation(const HistogramType* histogramF, const HistogramType* histogramR, const HistogramType* histogramFR, const Image& imageF, const Image& imageR){
+double cpuMutualInformation2(const HistogramType* histogramF, const HistogramType* histogramR, const HistogramType* histogramFR, const Image& imageF, const Image& imageR){
 
 	double nbPixelsF = imageF.width*imageF.height;
 	double nbPixelsR = imageR.width*imageR.height;
-	double nbPixelsFR = nbPixelsF + nbPixelsR;
+
 	double mutualInformation = 0;
 
 	for (int binF = 0; binF != histogramSize; binF++) {
-	
+
 		for (int binR = 0; binR != histogramSize; binR++) {
 
 			double pF = histogramF[binF] / nbPixelsF;
 			double pR = histogramR[binR] / nbPixelsR;
-			double pFR = histogramFR[binF + histogramSize * binR] / nbPixelsFR;
+			double pFR = histogramFR[binF + histogramSize * binR] / nbPixelsF;
+
+			if (pFR != 0) {
+
+				mutualInformation += pFR*log2(pFR / (pF * pR));
+			}
+		}
+	}
+
+	return mutualInformation;
+}
+
+template<typename HistogramType, int histogramSize>
+double cpuMutualInformation(const HistogramType* histogramFR){
+
+	double histogramSum = 0;
+	HistogramType histogramF[histogramSize] = {};
+	HistogramType histogramR[histogramSize] = {};
+
+	for (int binF = 0; binF != histogramSize; binF++) {
+
+		for (int binR = 0; binR != histogramSize; binR++) {
+			
+			histogramSum += histogramFR[binF + histogramSize * binR];
+			histogramF[binF] += histogramFR[binF + histogramSize * binR];
+			histogramR[binR] += histogramFR[binF + histogramSize * binR];
+		}
+	}
+
+	double mutualInformation = 0;
+
+	for (int binF = 0; binF != histogramSize; binF++) {
+
+		for (int binR = 0; binR != histogramSize; binR++) {
+
+			double pF = histogramF[binF] / histogramSum;
+			double pR = histogramR[binR] / histogramSum;
+			double pFR = histogramFR[binF + histogramSize * binR] / histogramSum;
 
 			if (pFR != 0) {
 
@@ -81,34 +113,39 @@ int main(int argc, char* argv[]) {
 
 	// Pixels loading
 	int heightF, widthF, bitsPerPixelF, heightR, widthR, bitsPerPixelR;
-	unsigned char* pixelsF = stbi_load("..//data//testF.jpg", &heightF, &widthF, &bitsPerPixelF, 1);
-	unsigned char* pixelsR = stbi_load("..//data//testR.jpg", &heightR, &widthR, &bitsPerPixelR, 1);
+	unsigned char* pixelsF = stbi_load("..//data//imageF.jpg", &heightF, &widthF, &bitsPerPixelF, 1);
+	unsigned char* pixelsR = stbi_load("..//data//imageR.jpg", &heightR, &widthR, &bitsPerPixelR, 1);
 
-	cout << "Image F : width: " << widthF << ", height: " << heightF << endl;
-	cout << "Image R : width: " << widthR << ", height: " << heightR << endl;
+	if (heightF != heightR || widthF != widthR) {
+	
+		cout << "Error: both images must have the same dimensions!" << endl;
+	}
 
-	// Images definition
-	Image imageF = { widthF, heightF, pixelsF };
-	Image imageR = { widthF, heightR, pixelsR };
+	else {
 
-	// Histogram
-	unsigned int* histogramF = cpuHistogram1D<unsigned int, 256>(imageF);
-	unsigned int* histogramR = cpuHistogram1D<unsigned int, 256>(imageR);
-	unsigned int* histogramFR = cpuHistogram2D<unsigned int, 256>(imageF, imageR);
+		// Images definition
+		Image imageF = { widthF, heightF, pixelsF };
+		Image imageR = { widthF, heightR, pixelsR };
 
-	cout << "HistogramFR[][]: " << histogramFR[0 + 256 * 247] << endl;
+		// Types definition
+		typedef double HistogramType;
+		const int histogramSize = 256;
 
-	// Mutual information
-	double mutualInformation = cpuMutualInformation<unsigned int, 256>(histogramF, histogramR, histogramFR, imageF, imageR);
+		// Histogram 2D
+		HistogramType* histogramFR = cpuHistogram2D<HistogramType, histogramSize>(imageF, imageR);
 
-	cout << "Mutual information: " << mutualInformation << endl;
+		// Mutual information
+		double mutualInformation = cpuMutualInformation<HistogramType, histogramSize>(histogramFR);
 
-	// Memory free
-	stbi_image_free(imageF.pixels);
-	stbi_image_free(imageR.pixels);
-	delete histogramF;
-	delete histogramR;
-	delete histogramFR;
+		cout << "Mutual information: " << mutualInformation << endl;
+
+		gpuRegistration(imageF, imageR);
+
+		// Memory free
+		stbi_image_free(imageF.pixels);
+		stbi_image_free(imageR.pixels);
+		delete histogramFR;
+	}
 
 	// Prompt to end
 	int end;
