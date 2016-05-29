@@ -1,12 +1,23 @@
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define _USE_MATH_DEFINES
 
+#include <chrono>
+#include <math.h>
 #include <iostream>
 #include <string>
 #include <stb_image.h>
+#include <stb_image_write.h>
+#include <vector>
 
-#include "gpu.h"
+#include "gpuRegistration.h"
+#include "transform.h"
 
 using namespace std;
+
+// Types definition
+typedef int HistogramType;
+const int histogramSize = 256;
 
 template<typename HistogramType, int histogramSize>
 HistogramType* cpuHistogram1D(const Image& image) {
@@ -28,10 +39,10 @@ HistogramType* cpuHistogram1D(const Image& image) {
 }
 
 template<typename HistogramType, int histogramSize>
-HistogramType* cpuHistogram2D(const Image& imageF, const Image& imageR) {
+HistogramType* cpuHistogram2D(const Image& image1, const Image& image2) {
 
-	int height = imageF.height;
-	int width = imageF.width;
+	int height = image1.height;
+	int width = image1.width;
 
 	HistogramType* histogram = new HistogramType[histogramSize * histogramSize]();
 
@@ -39,7 +50,7 @@ HistogramType* cpuHistogram2D(const Image& imageF, const Image& imageR) {
 
 		for (int x = 0; x != width; x++) {
 
-			histogram[ imageF.pixels[x + width * y] + histogramSize * imageR.pixels[x + width * y] ] += 1;
+			histogram[image1.pixels[x + width * y] + histogramSize * image2.pixels[x + width * y]] += 1;
 		}
 	}
 
@@ -47,24 +58,24 @@ HistogramType* cpuHistogram2D(const Image& imageF, const Image& imageR) {
 }
 
 template<typename HistogramType, int histogramSize>
-double cpuMutualInformation2(const HistogramType* histogramF, const HistogramType* histogramR, const HistogramType* histogramFR, const Image& imageF, const Image& imageR){
+double cpuMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, const Image& image1, const Image& image2){
 
-	double nbPixelsF = imageF.width*imageF.height;
-	double nbPixelsR = imageR.width*imageR.height;
+	double nbPixels1 = image1.width*image1.height;
+	double nbPixels2 = image2.width*image2.height;
 
 	double mutualInformation = 0;
 
-	for (int binF = 0; binF != histogramSize; binF++) {
+	for (int bin1 = 0; bin1 != histogramSize; bin1++) {
 
-		for (int binR = 0; binR != histogramSize; binR++) {
+		for (int bin2 = 0; bin2 != histogramSize; bin2++) {
 
-			double pF = histogramF[binF] / nbPixelsF;
-			double pR = histogramR[binR] / nbPixelsR;
-			double pFR = histogramFR[binF + histogramSize * binR] / nbPixelsF;
+			double p1 = histogram1[bin1] / nbfPixels;
+			double p2 = histogram2[bin2] / nbrPixels;
+			double p12 = histogram2D[bin1 + histogramSize * bin2] / nbfPixels;
 
-			if (pFR != 0) {
+			if (p12 != 0) {
 
-				mutualInformation += pFR*log2(pFR / (pF * pR));
+				mutualInformation += p12*log2(p12 / (p1 * p2));
 			}
 		}
 	}
@@ -73,35 +84,35 @@ double cpuMutualInformation2(const HistogramType* histogramF, const HistogramTyp
 }
 
 template<typename HistogramType, int histogramSize>
-double cpuMutualInformation(const HistogramType* histogramFR){
+double cpuMutualInformation(const HistogramType* histogram2D){
 
 	double histogramSum = 0;
-	HistogramType histogramF[histogramSize] = {};
-	HistogramType histogramR[histogramSize] = {};
+	HistogramType histogram1[histogramSize] = {};
+	HistogramType histogram2[histogramSize] = {};
 
-	for (int binF = 0; binF != histogramSize; binF++) {
+	for (int bin1 = 0; bin1 != histogramSize; bin1++) {
 
-		for (int binR = 0; binR != histogramSize; binR++) {
+		for (int bin2 = 0; bin2 != histogramSize; bin2++) {
 			
-			histogramSum += histogramFR[binF + histogramSize * binR];
-			histogramF[binF] += histogramFR[binF + histogramSize * binR];
-			histogramR[binR] += histogramFR[binF + histogramSize * binR];
+			histogramSum += histogram2D[bin1 + histogramSize * bin2];
+			histogram1[bin1] += histogram2D[bin1 + histogramSize * bin2];
+			histogram2[bin2] += histogram2D[bin1 + histogramSize * bin2];
 		}
 	}
 
 	double mutualInformation = 0;
 
-	for (int binF = 0; binF != histogramSize; binF++) {
+	for (int bin1 = 0; bin1 != histogramSize; bin1++) {
 
-		for (int binR = 0; binR != histogramSize; binR++) {
+		for (int bin2 = 0; bin2 != histogramSize; bin2++) {
 
-			double pF = histogramF[binF] / histogramSum;
-			double pR = histogramR[binR] / histogramSum;
-			double pFR = histogramFR[binF + histogramSize * binR] / histogramSum;
+			double p1 = histogram1[bin1] / histogramSum;
+			double p2 = histogram2[bin2] / histogramSum;
+			double p12 = histogram2D[bin1 + histogramSize * bin2] / histogramSum;
 
-			if (pFR != 0) {
+			if (p12 != 0) {
 
-				mutualInformation += pFR*log2(pFR / (pF * pR));
+				mutualInformation += p12*log2(p12 / (p1 * p2));
 			}
 		}
 	}
@@ -109,14 +120,102 @@ double cpuMutualInformation(const HistogramType* histogramFR){
 	return mutualInformation;
 }
 
+Image cpuApplyTransform(const Image& originalImage, const Transform& transform) {
+
+	Image transformedImage = { originalImage.width, originalImage.height, new unsigned char[originalImage.width * originalImage.height]() };
+
+	double centerX = originalImage.width / 2 - transform.tx;
+	double centerY = originalImage.height / 2 - transform.ty;
+
+	/* for (int y = 0; y != originalImage.height; y++) {
+
+		for (int x = 0; x != originalImage.width; x++) {
+
+			int newX = (int)((x + 0.5 - centerX)*cos(transform.rz * M_PI / 180.0) - (y + 0.5 - centerY)*sin(transform.rz * M_PI / 180.0) + transform.tx + centerX - 0.5);
+			int newY = (int)((x + 0.5 - centerX)*sin(transform.rz * M_PI / 180.0) + (y + 0.5 - centerY)*cos(transform.rz * M_PI / 180.0) + transform.ty + centerY - 0.5);
+
+			if (newX >= 0 && newX < transformedImage.width && newY >= 0  && newY < transformedImage.height) {
+
+				transformedImage.pixels[newX + transformedImage.width * newY] = originalImage.pixels[x + originalImage.width * y];
+			}
+		}
+	} */
+
+	for (int y = 0; y != originalImage.height; y++) {
+
+		for (int x = 0; x != originalImage.width; x++) {
+
+			int originalX = (int)((x - centerX)*cos(-transform.rz * M_PI / 180.0) - (y - centerY)*sin(-transform.rz * M_PI / 180.0) - transform.tx + centerX);
+			int originalY = (int)((x - centerX)*sin(-transform.rz * M_PI / 180.0) + (y - centerY)*cos(-transform.rz * M_PI / 180.0) - transform.ty + centerY);
+
+			if (originalX >= 0 && originalX < originalImage.width && originalY >= 0 && originalY < originalImage.height) {
+
+				transformedImage.pixels[x + transformedImage.width * y] = originalImage.pixels[originalX + originalImage.width * originalY];
+			}
+		}
+	}
+
+	return transformedImage;
+}
+
+Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
+	
+	vector<double> translationsX;
+	vector<double> translationsY;
+	vector<double> rotationsZ;
+
+	for (int i = 0; i != 20; i++) {
+	
+		translationsX.push_back(i + 10);
+		translationsY.push_back(i - 20);
+		rotationsZ.push_back(i - 30);
+	}
+
+	Transform optimalTransform = {0, 0, 0, 0, 0, 0};
+	double maxMutualInformation = 0;
+	/*double progress = 0;
+	double step = 100.0 / (translationsX.size()*translationsY.size()*rotationsZ.size());*/
+
+	for (int a = 0; a != translationsX.size(); a++) {
+		
+		for (int b = 0; b != translationsY.size(); b++) {
+		
+			for (int c = 0; c != rotationsZ.size(); c++) {
+
+				Transform transform = { translationsX[a], translationsY[b], 0, 0, 0, rotationsZ[c] };
+				Image transformedImage = cpuApplyTransform(floatingImage, transform);
+				HistogramType* histogram2D = cpuHistogram2D<HistogramType, histogramSize>(transformedImage, referenceImage);
+				double mutualInformation = cpuMutualInformation<HistogramType, histogramSize>(histogram2D);
+
+				if (mutualInformation > maxMutualInformation) {
+				
+					maxMutualInformation = mutualInformation;
+					optimalTransform = transform;
+				}
+
+				delete histogram2D;
+				delete transformedImage.pixels;
+
+				/*progress += step;
+				cout << progress << "%" << endl;*/
+			}
+		}
+	}
+
+	cout << "Optimal transform: Tx: " << optimalTransform.tx << ", Ty: " << optimalTransform.ty << ", Rz: " << optimalTransform.rz << endl;
+
+	return cpuApplyTransform(floatingImage, optimalTransform);
+
+}
+
 int main(int argc, char* argv[]) {
 
 	// Pixels loading
-	int heightF, widthF, bitsPerPixelF, heightR, widthR, bitsPerPixelR;
-	unsigned char* pixelsF = stbi_load("..//data//imageF.jpg", &heightF, &widthF, &bitsPerPixelF, 1);
-	unsigned char* pixelsR = stbi_load("..//data//imageR.jpg", &heightR, &widthR, &bitsPerPixelR, 1);
+	int fHeight, fWidth, fBitsPerPixel, rHeight, rWidth, rBitsPerPixel;
+	unsigned char* fPixels = stbi_load("..//data//floatingImage.jpg", &fWidth, &fHeight, &fBitsPerPixel, 1);
+	unsigned char* rPixels = stbi_load("..//data//referenceImage.jpg", &rWidth, &rHeight, &rBitsPerPixel, 1);
 
-	if (heightF != heightR || widthF != widthR) {
+	if (fHeight != rHeight || fWidth != rWidth) {
 	
 		cout << "Error: both images must have the same dimensions!" << endl;
 	}
@@ -124,27 +223,48 @@ int main(int argc, char* argv[]) {
 	else {
 
 		// Images definition
-		Image imageF = { widthF, heightF, pixelsF };
-		Image imageR = { widthF, heightR, pixelsR };
+		Image floatingImage = { fWidth, fHeight, fPixels };
+		Image referenceImage = { fWidth, rHeight, rPixels };
 
-		// Types definition
-		typedef double HistogramType;
-		const int histogramSize = 256;
+		// CPU registration
+		auto begin = chrono::high_resolution_clock::now();
+		Image cpuRegisteredImage = cpuRegister(floatingImage, referenceImage);
+		auto end = chrono::high_resolution_clock::now();
+		cout << "CPU: " << chrono::duration_cast<chrono::microseconds>(end - begin).count() << "us" << std::endl;
+
+		// GPU registration
+		begin = chrono::high_resolution_clock::now();
+		Image gpuRegisteredImage = gpuRegister(floatingImage, referenceImage);
+		end = chrono::high_resolution_clock::now();
+		cout << "GPU: " << chrono::duration_cast<chrono::microseconds>(end - begin).count() << "us" << std::endl;
+
+		// Image export
+		stbi_write_png("..//data//cpuRegistered.png", cpuRegisteredImage.width, cpuRegisteredImage.height, 1, cpuRegisteredImage.pixels, cpuRegisteredImage.width);
+		stbi_write_png("..//data//gpuRegistered.png", gpuRegisteredImage.width, gpuRegisteredImage.height, 1, gpuRegisteredImage.pixels, gpuRegisteredImage.width);
+
+		// Memory free
+		stbi_image_free(floatingImage.pixels);
+		stbi_image_free(referenceImage.pixels);
+		stbi_image_free(cpuRegisteredImage.pixels);
+		stbi_image_free(gpuRegisteredImage.pixels);
+
+	
+		/*// Image transformation
+		Transform transform = { -20, 10, 0, 0, 0, 20 };
+		Image transformedImage = cpuApplyTransform(referenceImage, transform);
+		cout << stbi_write_png("..//data//transformed.png", transformedImage.width, transformedImage.height, 1, transformedImage.pixels, transformedImage.width) << endl;
 
 		// Histogram 2D
-		HistogramType* histogramFR = cpuHistogram2D<HistogramType, histogramSize>(imageF, imageR);
+		HistogramType* histogram2D = cpuHistogram2D<HistogramType, histogramSize>(floatingImage, referenceImage);
 
 		// Mutual information
-		double mutualInformation = cpuMutualInformation<HistogramType, histogramSize>(histogramFR);
+		double mutualInformation = cpuMutualInformation<HistogramType, histogramSize>(histogram2D);
 
 		cout << "Mutual information: " << mutualInformation << endl;
 
-		gpuRegistration(imageF, imageR);
-
 		// Memory free
-		stbi_image_free(imageF.pixels);
-		stbi_image_free(imageR.pixels);
-		delete histogramFR;
+		delete transformedImage.pixels;
+		delete histogram2D;*/
 	}
 
 	// Prompt to end
