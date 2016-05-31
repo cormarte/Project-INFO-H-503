@@ -124,8 +124,8 @@ Image cpuApplyTransform(const Image& originalImage, const Transform& transform) 
 
 	Image transformedImage = { originalImage.width, originalImage.height, new unsigned char[originalImage.width * originalImage.height]() };
 
-	double centerX = originalImage.width / 2 - transform.tx;
-	double centerY = originalImage.height / 2 - transform.ty;
+	int centerX = originalImage.width / 2 - transform.tx;
+	int centerY = originalImage.height / 2 - transform.ty;
 
 	/* for (int y = 0; y != originalImage.height; y++) {
 
@@ -164,7 +164,7 @@ Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
 	vector<double> translationsY;
 	vector<double> rotationsZ;
 
-	for (int i = 0; i != 20; i++) {
+	for (int i = 0; i != 1; i++) {
 	
 		translationsX.push_back(i + 10);
 		translationsY.push_back(i - 20);
@@ -187,6 +187,8 @@ Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
 				HistogramType* histogram2D = cpuHistogram2D<HistogramType, histogramSize>(transformedImage, referenceImage);
 				double mutualInformation = cpuMutualInformation<HistogramType, histogramSize>(histogram2D);
 
+				//cout << "CPU mutual information: " << mutualInformation << endl;
+
 				if (mutualInformation > maxMutualInformation) {
 				
 					maxMutualInformation = mutualInformation;
@@ -205,7 +207,6 @@ Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
 	cout << "Optimal transform: Tx: " << optimalTransform.tx << ", Ty: " << optimalTransform.ty << ", Rz: " << optimalTransform.rz << endl;
 
 	return cpuApplyTransform(floatingImage, optimalTransform);
-
 }
 
 int main(int argc, char* argv[]) {
@@ -224,7 +225,7 @@ int main(int argc, char* argv[]) {
 
 		// Images definition
 		Image floatingImage = { fWidth, fHeight, fPixels };
-		Image referenceImage = { fWidth, rHeight, rPixels };
+		Image referenceImage = { rWidth, rHeight, rPixels };
 
 		// CPU registration
 		auto begin = chrono::high_resolution_clock::now();
