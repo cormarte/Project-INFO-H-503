@@ -1,9 +1,9 @@
 struct Transform {
 
-	double tx;
-	double ty;
-	double tz;
-	double rx;
-	double ry;
-	double rz;
+	int tx;
+	int ty;
+	int tz;
+	float rx;
+	float ry;
+	float rz;
 };

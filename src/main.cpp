@@ -148,7 +148,7 @@ Image cpuApplyTransform(const Image& originalImage, const Transform& transform) 
 			int originalX = (int)((x - centerX)*cos(-transform.rz * M_PI / 180.0) - (y - centerY)*sin(-transform.rz * M_PI / 180.0) - transform.tx + centerX);
 			int originalY = (int)((x - centerX)*sin(-transform.rz * M_PI / 180.0) + (y - centerY)*cos(-transform.rz * M_PI / 180.0) - transform.ty + centerY);
 
-			if (originalX >= 0 && originalX < originalImage.width && originalY >= 0 && originalY < originalImage.height) {
+			if (originalX >= 0 && (unsigned int)originalX < originalImage.width && originalY >= 0 && (unsigned int)originalY < originalImage.height) {
 
 				transformedImage.pixels[x + transformedImage.width * y] = originalImage.pixels[originalX + originalImage.width * originalY];
 			}
@@ -160,9 +160,9 @@ Image cpuApplyTransform(const Image& originalImage, const Transform& transform) 
 
 Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
 	
-	vector<double> translationsX;
-	vector<double> translationsY;
-	vector<double> rotationsZ;
+	vector<int> translationsX;
+	vector<int> translationsY;
+	vector<float> rotationsZ;
 
 	for (int i = 0; i != 1; i++) {
 	
@@ -224,8 +224,8 @@ int main(int argc, char* argv[]) {
 	else {
 
 		// Images definition
-		Image floatingImage = { fWidth, fHeight, fPixels };
-		Image referenceImage = { rWidth, rHeight, rPixels };
+		Image floatingImage = { (unsigned int)fWidth, (unsigned int)fHeight, fPixels };
+		Image referenceImage = { (unsigned int)rWidth, (unsigned int)rHeight, rPixels };
 
 		// CPU registration
 		auto begin = chrono::high_resolution_clock::now();

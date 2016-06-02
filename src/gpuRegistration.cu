@@ -17,12 +17,12 @@ using namespace std;
 #define BLOCKDIMY 16
 #define BLOCKDIM1D 1024 // For histogram reduction, to adapt to max number of threads per block
 
-typedef int HistogramType;
+typedef unsigned int HistogramType;
 
 
 
 
-__global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigned char* devTransformedImage, const int width, const int height, const double tx, const double ty, const double rz) {
+__global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigned char* devTransformedImage, const unsigned int width, const unsigned int height, const size_t pitch, const int tx, const int ty, const float rz) {
 
 	// Pixel coordinates
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,20 +30,25 @@ __global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigne
 
 	if (x < width && y < height) {
 
+		float cosrz, sinrz;
+		__sincosf(-rz * M_PI / 180.0f, &sinrz, &cosrz);
+
 		int centerX = width / 2 - tx;
 		int centerY = height / 2 - ty;
 
-		int originalX = (int)((x - centerX)*cos(-rz * M_PI / 180.0) - (y - centerY)*sin(-rz * M_PI / 180.0) - tx + centerX);
-		int originalY = (int)((x - centerX)*sin(-rz * M_PI / 180.0) + (y - centerY)*cos(-rz * M_PI / 180.0) - ty + centerY);
+		int originalX = (int)((x - centerX)*cosrz - (y - centerY)*sinrz - tx + centerX);
+		int originalY = (int)((x - centerX)*sinrz + (y - centerY)*cosrz - ty + centerY);
 
 		if (originalX >= 0 && originalX < width && originalY >= 0 && originalY < height) {
 
-			devTransformedImage[x + width * y] = devOriginalImage[originalX + width * originalY];
+			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = *(unsigned char*)(((char*)devOriginalImage + originalY * pitch) + originalX);
+			//devTransformedImage[x + width * y] = devOriginalImage[originalX + width * originalY];
 		}
 
 		else {
 
-			devTransformedImage[x + width * y] = 0;
+			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = 0;
+			//devTransformedImage[x + width * y] = 0;
 		}
 	}
 }
@@ -51,7 +56,7 @@ __global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigne
 
 
 
-__global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const int width, const int height, HistogramType* devHistogram2D) {
+__global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const unsigned int width, const unsigned int height, const size_t pitch, HistogramType* devHistogram2D) {
 
 	/* Computes 2D histogram in global memory */
 
@@ -63,8 +68,10 @@ __global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, cons
 	// Image boundaries check and global histogram incrementation using adomicAdd
 	if (x < width && y < height) {
 
-		unsigned char f = devFloatingImage[x + width * y];
-		unsigned char r = devReferenceImage[x + width * y];
+		unsigned char f = *(unsigned char*)(((char*)devFloatingImage + y * pitch) + x);
+		unsigned char r = *(unsigned char*)(((char*)devReferenceImage + y * pitch) + x);
+		/*unsigned char f = devFloatingImage[x + width * y];
+		unsigned char r = devReferenceImage[x + width * y];*/
 
 		atomicAdd(&devHistogram2D[f + 256 * r], 1);
 	}
@@ -73,7 +80,7 @@ __global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, cons
 
 
 
-__global__ void gpuSharedHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const int width, const int height, HistogramType* devHistogram2D) {
+__global__ void gpuSharedHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const unsigned int width, const unsigned int height, const size_t pitch, HistogramType* devHistogram2D) {
 
 	/* Uses shared memory to store local 2D histograms. However, local histograms size cannot be 256x256,
 	   which would require 64kB of share memory (only 48kB are available). 2 thread blocks are used for
@@ -103,8 +110,10 @@ __global__ void gpuSharedHistogram2D(const unsigned char* devFloatingImage, cons
 
 	if (x < width && y < height) {
 
-		unsigned char f = devFloatingImage[x + width * y];
-		unsigned char r = devReferenceImage[x + width * y];
+		unsigned char f = *(unsigned char*)(((char*)devFloatingImage + y * pitch) + x);
+		unsigned char r = *(unsigned char*)(((char*)devReferenceImage + y * pitch) + x);
+		/*unsigned char f = devFloatingImage[x + width * y];
+		unsigned char r = devReferenceImage[x + width * y];*/
 
 		if ((!(blockIdx.x % 2) && f < 128) || ((blockIdx.x % 2) && f >= 128)) {
 		
@@ -134,7 +143,23 @@ __global__ void gpuSharedHistogram2D(const unsigned char* devFloatingImage, cons
 
 
 
-__global__ void gpuSharedHistogram1D(const unsigned char* image, const int width, const int height, HistogramType* histogram) {
+__global__ void gpuGlobalHistogram1D(const unsigned char* image, const unsigned int width, const unsigned int height, const size_t pitch, HistogramType* histogram) {
+
+	// Pixel coordinates
+	int x = blockIdx.x * blockDim.x + threadIdx.x;
+	int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+	if (x < width && y < height) {
+
+		atomicAdd(&histogram[*(unsigned char*)(((char*)image + y * pitch) + x)], 1);
+		//atomicAdd(&histogram[image[x + width * y]], 1);
+	}
+}
+
+
+
+
+__global__ void gpuSharedHistogram1D(const unsigned char* image, const unsigned int width, const unsigned int height, const size_t pitch, HistogramType* histogram) {
 
 	__shared__  HistogramType localHistogram[256];
 
@@ -155,11 +180,11 @@ __global__ void gpuSharedHistogram1D(const unsigned char* image, const int width
 	}
 
 	__syncthreads();
-
-
+	
 	if (x < width && y < height) {
 		
-		atomicAdd(&localHistogram[ image[x + width * y] ], 1);
+		atomicAdd(&localHistogram[ *(unsigned char*)(((char*)image + y * pitch) + x) ], 1);
+		//atomicAdd(&localHistogram[ image[x + width * y] ], 1);
 	}
 
 	__syncthreads();
@@ -173,7 +198,7 @@ __global__ void gpuSharedHistogram1D(const unsigned char* image, const int width
 
 
 
-__global__ void gpuPartialMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, int width, int height,  double* partialMutualInformation) {
+__global__ void gpuPartialMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, const unsigned int width, const unsigned int height, double* partialMutualInformation) {
 
 	// Bin coordinates
 	unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -240,54 +265,15 @@ __global__ void gpuReduce(const double* inputData, double* outputData)
 
 
 
-// To be replaced by a gpu implementation
-template<typename HistogramType, int histogramSize>
-double cpuMutualInformation(const HistogramType* histogram2D){
+Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImage) {
 
-	double histogramSum = 0;
-	HistogramType histogram1[histogramSize] = {};
-	HistogramType histogram2[histogramSize] = {};
-
-	for (int bin1 = 0; bin1 != histogramSize; bin1++) {
-
-		for (int bin2 = 0; bin2 != histogramSize; bin2++) {
-
-			histogramSum += histogram2D[bin1 + histogramSize * bin2];
-			histogram1[bin1] += histogram2D[bin1 + histogramSize * bin2];
-			histogram2[bin2] += histogram2D[bin1 + histogramSize * bin2];
-		}
-	}
-
-	double mutualInformation = 0;
-
-	for (int bin1 = 0; bin1 != histogramSize; bin1++) {
-
-		for (int bin2 = 0; bin2 != histogramSize; bin2++) {
-
-			double p1 = histogram1[bin1] / histogramSum;
-			double p2 = histogram2[bin2] / histogramSum;
-			double p12 = histogram2D[bin1 + histogramSize * bin2] / histogramSum;
-
-			if (p12 != 0) {
-
-				mutualInformation += p12*log2(p12 / (p1 * p2));
-			}
-		}
-	}
-
-	return mutualInformation;
-}
-
-
-
-
-Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
-
-	const int width = hostImageF.width;
-	const int height = hostImageF.height;
-	const int nbReductionBlocks = (256 * 256 + BLOCKDIM1D - 1) / (2 * BLOCKDIM1D); // First addition performed during shared memory loading, the number of blocks is thus reduced by two
+	const unsigned int width = hostFloatingImage.width;
+	const unsigned int height = hostFloatingImage.height;
+	const unsigned int nbReductionBlocks = (256 * 256 + BLOCKDIM1D - 1) / (2 * BLOCKDIM1D); // First addition performed during shared memory loading, the number of blocks is thus reduced by two
 
 	// Declarations
+	size_t imagePitch;
+	size_t histogram2DPitch;
 	unsigned char* devFloatingImage;
 	unsigned char* devReferenceImage;
 	unsigned char* devTransformedImage;
@@ -295,8 +281,8 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 	HistogramType* devTransformedHistogram;
 	HistogramType* devReferenceHistogram;
 	HistogramType* devHistogram2D;
-	HistogramType* hostFloatingHistogram = new HistogramType[256](); // DEBUG 
-	HistogramType* hostReferenceHistogram = new HistogramType[256](); // DEBUG
+	//HistogramType* hostFloatingHistogram = new HistogramType[256](); // DEBUG 
+	//HistogramType* hostReferenceHistogram = new HistogramType[256](); // DEBUG
 	HistogramType* hostHistogram2D = new HistogramType[256 * 256]();
 	double* devPartialMutualInformation;
 	double* devReducedPartialMutualInformation;
@@ -309,9 +295,12 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 	//CHECK(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1073741824));
 
 	// Device memory allocation
-	CHECK(cudaMalloc((void**)&devFloatingImage, width * height * sizeof(unsigned char)));
+	/*CHECK(cudaMalloc((void**)&devFloatingImage, width * height * sizeof(unsigned char)));
 	CHECK(cudaMalloc((void**)&devReferenceImage, width * height * sizeof(unsigned char)));
-	CHECK(cudaMalloc((void**)&devTransformedImage, width * height * sizeof(unsigned char)));
+	CHECK(cudaMalloc((void**)&devTransformedImage, width * height * sizeof(unsigned char)));*/
+	CHECK(cudaMallocPitch(&devFloatingImage, &imagePitch, width*sizeof(unsigned char), height*sizeof(unsigned char)));
+	CHECK(cudaMallocPitch(&devReferenceImage, &imagePitch, width*sizeof(unsigned char), height*sizeof(unsigned char)));
+	CHECK(cudaMallocPitch(&devTransformedImage, &imagePitch, width*sizeof(unsigned char), height*sizeof(unsigned char)));
 	CHECK(cudaMalloc((void**)&devTransformedHistogram, 256 * sizeof(HistogramType)));
 	CHECK(cudaMalloc((void**)&devReferenceHistogram, 256 * sizeof(HistogramType)));
 	CHECK(cudaMalloc((void**)&devHistogram2D, 256 * 256 * sizeof(HistogramType)));
@@ -319,8 +308,10 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 	CHECK(cudaMalloc((void**)&devReducedPartialMutualInformation, nbReductionBlocks * sizeof(double)));
 
 	// Host to device copy
-	CHECK(cudaMemcpy(devFloatingImage, hostImageF.pixels, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
-	CHECK(cudaMemcpy(devReferenceImage, hostImageR.pixels, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
+	/*CHECK(cudaMemcpy(devFloatingImage, hostFloatingImage.pixels, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy(devReferenceImage, hostReferenceImage.pixels, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));*/
+	CHECK(cudaMemcpy2D(devFloatingImage, imagePitch, hostFloatingImage.pixels, width*sizeof(unsigned char), width*sizeof(unsigned char), height*sizeof(unsigned char), cudaMemcpyHostToDevice));
+	CHECK(cudaMemcpy2D(devReferenceImage, imagePitch, hostReferenceImage.pixels, width*sizeof(unsigned char), width*sizeof(unsigned char), height*sizeof(unsigned char), cudaMemcpyHostToDevice));
 
 	// Blocks and grid dimensions
 	dim3 blockDimensions(BLOCKDIMX, BLOCKDIMY);
@@ -329,7 +320,7 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 	// Reference image histogram 1D
 	// Should only be computed once
 	CHECK(cudaMemset(devReferenceHistogram, 0, 256 * sizeof(HistogramType)));
-	gpuSharedHistogram1D << < gridDimensions, blockDimensions >> >(devReferenceImage, width, height, devReferenceHistogram);
+	gpuGlobalHistogram1D << < gridDimensions, blockDimensions >> >(devReferenceImage, width, height, imagePitch, devReferenceHistogram);
 	
 	// Transformed image histogram 1D
 	// There's no 1-to-1 correspondance between floating and transformed image, due to nearest neighbour approximation
@@ -338,9 +329,9 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 	gpuSharedHistogram1D << < gridDimensions, blockDimensions >> >(devTransformedImage, width, height, devTransformedHistogram); */
 
 	// Tested transforms
-	vector<double> translationsX;
-	vector<double> translationsY;
-	vector<double> rotationsZ;
+	vector<int> translationsX;
+	vector<int> translationsY;
+	vector<float> rotationsZ;
 
 	for (int i = 0; i != 1; i++) {
 
@@ -368,17 +359,17 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 				gridDimensions = dim3((width + BLOCKDIMX - 1) / BLOCKDIMX, (height + BLOCKDIMY - 1) / BLOCKDIMY);
 
 				// Transform
-				gpuApplyTransform << < gridDimensions, blockDimensions >> >(devFloatingImage, devTransformedImage, width, height, transform.tx, transform.ty, transform.rz);
+				gpuApplyTransform << < gridDimensions, blockDimensions >> >(devFloatingImage, devTransformedImage, width, height, imagePitch, transform.tx, transform.ty, transform.rz);
 
 				// Transformed image histogram 1D
 				// There's no 1-to-1 correspondance between floating and transformed image, due to nearest neighbour approximation
 				// Transformed image histogram have to be recomputed at after every transform (=> check if the results are significantly better !!!)
 				CHECK(cudaMemset(devTransformedHistogram, 0, 256 * sizeof(HistogramType)));
-				gpuSharedHistogram1D << < gridDimensions, blockDimensions >> >(devTransformedImage, width, height, devTransformedHistogram);
+				gpuGlobalHistogram1D << < gridDimensions, blockDimensions >> >(devTransformedImage, width, height, imagePitch, devTransformedHistogram);
 				
 				// Histogram 2D
 				CHECK(cudaMemset(devHistogram2D, 0, 256 * 256 * sizeof(HistogramType)));
-				gpuGlobalHistogram2D << < gridDimensions, blockDimensions >> >(devTransformedImage, devReferenceImage, width, height, devHistogram2D);
+				gpuGlobalHistogram2D << < gridDimensions, blockDimensions >> >(devTransformedImage, devReferenceImage, width, height, imagePitch, devHistogram2D);
 
 				// Grid redimensioning
 				gridDimensions = dim3((256 + BLOCKDIMX - 1) / BLOCKDIMX, (256 + BLOCKDIMY - 1) / BLOCKDIMY);
@@ -439,21 +430,28 @@ Image gpuRegister(const Image& hostImageF, const Image& hostImageR) {
 
 	// Result
 	cout << "Optimal transform: Tx: " << optimalTransform.tx << ", Ty: " << optimalTransform.ty << ", Rz: " << optimalTransform.rz << endl;
-	gpuApplyTransform << < gridDimensions, blockDimensions >> >(devFloatingImage, devTransformedImage, width, height, optimalTransform.tx, optimalTransform.ty, optimalTransform.rz);
+	gpuApplyTransform << < gridDimensions, blockDimensions >> >(devFloatingImage, devTransformedImage, width, height, imagePitch, optimalTransform.tx, optimalTransform.ty, optimalTransform.rz);
 
 	// Wait for GPU
 	CHECK(cudaDeviceSynchronize());
 
 	// Device to host copy
-	CHECK(cudaMemcpy(hostTransformedImage, devTransformedImage, width * height * sizeof(unsigned char), cudaMemcpyDeviceToHost));
+	//CHECK(cudaMemcpy(hostTransformedImage, devTransformedImage, width * height * sizeof(unsigned char), cudaMemcpyDeviceToHost));
+	CHECK(cudaMemcpy2D(hostTransformedImage, width*sizeof(unsigned char), devTransformedImage, imagePitch, width * sizeof(unsigned char), height * sizeof(unsigned char), cudaMemcpyDeviceToHost));
 
 	// Delete
 	delete hostHistogram2D;
 	delete hostReducedPartialMutualInformation;
-	// /!\ DEALLOCATE GPU MEMORY /!\
+	CHECK(cudaFree(devFloatingImage));
+	CHECK(cudaFree(devReferenceImage));
+	CHECK(cudaFree(devTransformedImage));
+	CHECK(cudaFree(devReferenceHistogram));
+	CHECK(cudaFree(devHistogram2D));
+	CHECK(cudaFree(devPartialMutualInformation));
+	CHECK(cudaFree(devReducedPartialMutualInformation));
 
 	// Transformed image
-	Image transformedImage = { width, height, hostTransformedImage };
+	Image transformedImage = { (unsigned int)width, (unsigned int)height, hostTransformedImage };
 	return transformedImage;
 	
 
