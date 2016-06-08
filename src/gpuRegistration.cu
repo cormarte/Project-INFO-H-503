@@ -41,14 +41,14 @@ __global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigne
 
 		if (originalX >= 0 && originalX < width && originalY >= 0 && originalY < height) {
 
-			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = *(unsigned char*)(((char*)devOriginalImage + originalY * pitch) + originalX);
 			//devTransformedImage[x + width * y] = devOriginalImage[originalX + width * originalY];
+			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = *(unsigned char*)(((char*)devOriginalImage + originalY * pitch) + originalX);
 		}
 
 		else {
 
-			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = 0;
 			//devTransformedImage[x + width * y] = 0;
+			*(unsigned char*)(((char*)devTransformedImage + y * pitch) + x) = 0;
 		}
 	}
 }
@@ -56,7 +56,8 @@ __global__ void gpuApplyTransform(const unsigned char* devOriginalImage, unsigne
 
 
 
-__global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const unsigned int width, const unsigned int height, const size_t pitch, HistogramType* devHistogram2D) {
+//__global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const unsigned int width, const unsigned int height, const size_t imagePitch, HistogramType* histogram2D, const size_t histogram2DPitch) {
+__global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, const unsigned char* devReferenceImage, const unsigned int width, const unsigned int height, const size_t imagePitch, HistogramType* histogram2D) {
 
 	/* Computes 2D histogram in global memory */
 
@@ -68,12 +69,14 @@ __global__ void gpuGlobalHistogram2D(const unsigned char* devFloatingImage, cons
 	// Image boundaries check and global histogram incrementation using adomicAdd
 	if (x < width && y < height) {
 
-		unsigned char f = *(unsigned char*)(((char*)devFloatingImage + y * pitch) + x);
-		unsigned char r = *(unsigned char*)(((char*)devReferenceImage + y * pitch) + x);
+		unsigned char f = *(unsigned char*)(((char*)devFloatingImage + y * imagePitch) + x);
+		unsigned char r = *(unsigned char*)(((char*)devReferenceImage + y * imagePitch) + x);
 		/*unsigned char f = devFloatingImage[x + width * y];
 		unsigned char r = devReferenceImage[x + width * y];*/
 
-		atomicAdd(&devHistogram2D[f + 256 * r], 1);
+		
+		atomicAdd(&histogram2D[f + 256 * r], 1);
+		//atomicAdd((HistogramType*)((char*)histogram2D + r * histogram2DPitch) + f, 1);
 	}
 }
 
@@ -151,8 +154,8 @@ __global__ void gpuGlobalHistogram1D(const unsigned char* image, const unsigned 
 
 	if (x < width && y < height) {
 
-		atomicAdd(&histogram[*(unsigned char*)(((char*)image + y * pitch) + x)], 1);
 		//atomicAdd(&histogram[image[x + width * y]], 1);
+		atomicAdd(&histogram[*(unsigned char*)(((char*)image + y * pitch) + x)], 1);
 	}
 }
 
@@ -183,8 +186,8 @@ __global__ void gpuSharedHistogram1D(const unsigned char* image, const unsigned 
 	
 	if (x < width && y < height) {
 		
-		atomicAdd(&localHistogram[ *(unsigned char*)(((char*)image + y * pitch) + x) ], 1);
 		//atomicAdd(&localHistogram[ image[x + width * y] ], 1);
+		atomicAdd(&localHistogram[ *(unsigned char*)(((char*)image + y * pitch) + x) ], 1);
 	}
 
 	__syncthreads();
@@ -198,7 +201,8 @@ __global__ void gpuSharedHistogram1D(const unsigned char* image, const unsigned 
 
 
 
-__global__ void gpuPartialMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, const unsigned int width, const unsigned int height, double* partialMutualInformation) {
+//__global__ void gpuPartialMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, const size_t histogram2DPitch, const unsigned int width, const unsigned int height, float* partialMutualInformation) {
+__global__ void gpuPartialMutualInformation(const HistogramType* histogram1, const HistogramType* histogram2, const HistogramType* histogram2D, const unsigned int width, const unsigned int height, float* partialMutualInformation) {
 
 	// Bin coordinates
 	unsigned int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -208,13 +212,14 @@ __global__ void gpuPartialMutualInformation(const HistogramType* histogram1, con
 	if (x < 256 && y < 256) {
 
 		int histogramSum = width * height;
-		double p1 = (1.0 * histogram1[x]) / histogramSum;
-		double p2 = (1.0 * histogram2[y]) / histogramSum;
-		double p12 = (1.0 * histogram2D[x + 256 * y]) / histogramSum;
+		float p1 = (1.0f * histogram1[x]) / histogramSum;
+		float p2 = (1.0f * histogram2[y]) / histogramSum;
+		float p12 = (1.0f * histogram2D[x + 256 * y]) / histogramSum;
+		//float p12 = (1.0f * *((HistogramType*)((char*)histogram2D + y * histogram2DPitch) + x)) / histogramSum;
 
 		if (p12 != 0) {
 
-			partialMutualInformation[x + 256 * y] = p12*log2(p12 / (p1 * p2));
+			partialMutualInformation[x + 256 * y] = p12*__log2f(p12 / (p1 * p2));
 		}
 
 		else {
@@ -227,10 +232,10 @@ __global__ void gpuPartialMutualInformation(const HistogramType* histogram1, con
 
 
 template <unsigned int blockSize>
-__global__ void gpuReduce(const double* inputData, double* outputData)
+__global__ void gpuReduce(const float* inputData, float* outputData)
 {
 	// Dynamic shared memory allocation
-	__shared__ double localData[blockSize];
+	__shared__ float localData[blockSize];
 
 	unsigned int tid = threadIdx.x;
 
@@ -273,7 +278,7 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 
 	// Declarations
 	size_t imagePitch;
-	size_t histogram2DPitch;
+	//size_t histogram2DPitch;
 	unsigned char* devFloatingImage;
 	unsigned char* devReferenceImage;
 	unsigned char* devTransformedImage;
@@ -284,9 +289,9 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 	//HistogramType* hostFloatingHistogram = new HistogramType[256](); // DEBUG 
 	//HistogramType* hostReferenceHistogram = new HistogramType[256](); // DEBUG
 	HistogramType* hostHistogram2D = new HistogramType[256 * 256]();
-	double* devPartialMutualInformation;
-	double* devReducedPartialMutualInformation;
-	double* hostReducedPartialMutualInformation = new double[nbReductionBlocks];
+	float* devPartialMutualInformation;
+	float* devReducedPartialMutualInformation;
+	float* hostReducedPartialMutualInformation = new float[nbReductionBlocks];
 
 	// Device selection
 	CHECK(cudaSetDevice(0));
@@ -304,8 +309,9 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 	CHECK(cudaMalloc((void**)&devTransformedHistogram, 256 * sizeof(HistogramType)));
 	CHECK(cudaMalloc((void**)&devReferenceHistogram, 256 * sizeof(HistogramType)));
 	CHECK(cudaMalloc((void**)&devHistogram2D, 256 * 256 * sizeof(HistogramType)));
-	CHECK(cudaMalloc((void**)&devPartialMutualInformation, 256 * 256 * sizeof(double)));
-	CHECK(cudaMalloc((void**)&devReducedPartialMutualInformation, nbReductionBlocks * sizeof(double)));
+	//CHECK(cudaMallocPitch(&devHistogram2D, &histogram2DPitch, 256 * sizeof(HistogramType), 256 * sizeof(HistogramType)));
+	CHECK(cudaMalloc((void**)&devPartialMutualInformation, 256 * 256 * sizeof(float)));
+	CHECK(cudaMalloc((void**)&devReducedPartialMutualInformation, nbReductionBlocks * sizeof(float)));
 
 	// Host to device copy
 	/*CHECK(cudaMemcpy(devFloatingImage, hostFloatingImage.pixels, width * height * sizeof(unsigned char), cudaMemcpyHostToDevice));
@@ -342,7 +348,7 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 
 	// Resgistration
 	Transform optimalTransform = { 0, 0, 0, 0, 0, 0 };
-	double hostMaxMutualInformation = 0;
+	float hostMaxMutualInformation = 0;
 	/*double progress = 0;
 	double step = 100.0 / (translationsX.size()*translationsY.size()*rotationsZ.size());*/
 
@@ -369,13 +375,16 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 				
 				// Histogram 2D
 				CHECK(cudaMemset(devHistogram2D, 0, 256 * 256 * sizeof(HistogramType)));
+				//CHECK(cudaMemset2D(devHistogram2D, histogram2DPitch, 0, 256 * sizeof(HistogramType), 256));
 				gpuGlobalHistogram2D << < gridDimensions, blockDimensions >> >(devTransformedImage, devReferenceImage, width, height, imagePitch, devHistogram2D);
+				//gpuGlobalHistogram2D << < gridDimensions, blockDimensions >> >(devTransformedImage, devReferenceImage, width, height, imagePitch, devHistogram2D, histogram2DPitch);
 
 				// Grid redimensioning
 				gridDimensions = dim3((256 + BLOCKDIMX - 1) / BLOCKDIMX, (256 + BLOCKDIMY - 1) / BLOCKDIMY);
 
 				// Partial mutual information
 				gpuPartialMutualInformation << < gridDimensions, blockDimensions >> > (devTransformedHistogram, devReferenceHistogram, devHistogram2D, width, height, devPartialMutualInformation);
+				//gpuPartialMutualInformation << < gridDimensions, blockDimensions >> > (devTransformedHistogram, devReferenceHistogram, devHistogram2D, histogram2DPitch, width, height, devPartialMutualInformation);
 
 				// Blocks and grid redimensioning
 				blockDimensions = dim3(BLOCKDIM1D);
@@ -388,16 +397,15 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 				CHECK(cudaDeviceSynchronize());
 
 				// Reduced partial mutual information copy
-				CHECK(cudaMemcpy(hostReducedPartialMutualInformation, devReducedPartialMutualInformation, nbReductionBlocks * sizeof(double), cudaMemcpyDeviceToHost));
+				CHECK(cudaMemcpy(hostReducedPartialMutualInformation, devReducedPartialMutualInformation, nbReductionBlocks * sizeof(float), cudaMemcpyDeviceToHost));
 
 				// Final reduction on CPU
-				double hostMutualInformation = 0;
+				float hostMutualInformation = 0;
 
 				for (int i = 0; i < nbReductionBlocks; i++) {
 				
 					hostMutualInformation += hostReducedPartialMutualInformation[i];
 
-					//cout << hostReducedPartialMutualInformation[i] << endl;
 				}
 
 				//cout << "GPU mutual information: " << hostMutualInformation << endl;
@@ -411,15 +419,6 @@ Image gpuRegister(const Image& hostFloatingImage, const Image& hostReferenceImag
 
 				/*progress += step;
 				cout << progress << "%" << endl;*/
-
-				// Old version using CPU MI computation
-				/* // Device to host copy
-				CHECK(cudaMemcpy(hostHistogram2D, devHistogram2D, 256 * 256 * sizeof(HistogramType), cudaMemcpyDeviceToHost));
-
-				// Mutual information
-				double mutualInformation = cpuMutualInformation<HistogramType, 256>(hostHistogram2D); */
-
-				//
 			}
 		}
 	}
