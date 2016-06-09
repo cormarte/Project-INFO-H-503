@@ -1,0 +1,7 @@
+﻿  cpuRegistration.cpp
+cpuRegistration.cpp(127): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+  main.cpp
+  Generating code
+  All 309 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  Project-INFO-H-503.vcxproj -> D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src (VS2015)\x64\Release\Project-INFO-H-503.exe

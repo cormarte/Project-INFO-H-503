@@ -1,0 +1,5 @@
+﻿  main.cpp
+  cpuRegistration.cpp
+d:\documents de corentin\documents\ulb\ma2\info-h-503\projet\src (vs2015)\cpuregistration.cpp(127): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+  Generating Code...
+  Project-INFO-H-503.vcxproj -> D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src (VS2015)\x64\Debug\Project-INFO-H-503.exe

@@ -1,7 +1,17 @@
-﻿Build started 08/06/2016 15:49:48.
+﻿Build started 09/06/2016 22:22:15.
      1>Project "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\PROJECT-INFO-H-503.vcxproj" on node 2 (Build target(s)).
-     1>ClCompile:
-         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"..\libs\freeimage-3.17.0\include" /I"..\libs\stb_image-2.12\include" /I"..\libs\stb_image_write-1.02\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt main.cpp
+     1>AddCudaCompileDeps:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\cl.exe /E /nologo /showIncludes /TP /D__CUDACC__ /DWIN32 /D_DEBUG /D_CONSOLE /D_MBCS /I..\libs\freeimage-3.17.0\include /I..\libs\stb_image-2.12\include /I..\libs\stb_image_write-1.02\include /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I. /FIcuda_runtime.h /c "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\gpuRegistration.cu" 
+       CudaBuild:
+         Compiling CUDA source file gpuRegistration.cu...
+         cmd.exe /C "C:\Users\Corentin\AppData\Local\Temp\tmp81e5dd8ad52c429cac9a10fff6a93a70.cmd"
+         "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\freeimage-3.17.0\include" -I"..\libs\stb_image-2.12\include" -I"..\libs\stb_image_write-1.02\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\gpuRegistration.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\gpuRegistration.cu"
+         
+         D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2013 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin"  -I"..\libs\freeimage-3.17.0\include" -I"..\libs\stb_image-2.12\include" -I"..\libs\stb_image_write-1.02\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include"  -G   --keep-dir Debug -maxrregcount=0  --machine 32 --compile -cudart static  -g   -DWIN32 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Zi /RTC1 /MDd " -o Debug\gpuRegistration.cu.obj "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\gpuRegistration.cu" 
+         gpuRegistration.cu
+     1>D:/Documents de Corentin/Documents/ULB/MA2/INFO-H-503/Projet/src/gpuRegistration.cu(246): warning C4244: 'argument' : conversion from 'int' to 'float', possible loss of data
+       ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /I"..\libs\freeimage-3.17.0\include" /I"..\libs\stb_image-2.12\include" /I"..\libs\stb_image_write-1.02\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include" /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _MBCS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt cpuRegistration.cpp main.cpp
          main.cpp
      1>d:\documents de corentin\documents\ulb\ma2\info-h-503\projet\libs\stb_image_write-1.02\include\stb_image_write.h(196): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 12.0\vc\include\stdio.h(211) : see declaration of 'fopen'
@@ -9,10 +19,13 @@
                  c:\program files (x86)\microsoft visual studio 12.0\vc\include\stdio.h(356) : see declaration of 'sprintf'
      1>d:\documents de corentin\documents\ulb\ma2\info-h-503\projet\libs\stb_image_write-1.02\include\stb_image_write.h(972): warning C4996: 'fopen': This function or variable may be unsafe. Consider using fopen_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
                  c:\program files (x86)\microsoft visual studio 12.0\vc\include\stdio.h(211) : see declaration of 'fopen'
-     1>d:\documents de corentin\documents\ulb\ma2\info-h-503\projet\src\main.cpp(171): warning C4244: 'argument' : conversion from 'int' to 'float', possible loss of data
+         cpuRegistration.cpp
+     1>d:\documents de corentin\documents\ulb\ma2\info-h-503\projet\src\cpuregistration.cpp(127): warning C4244: 'argument' : conversion from 'int' to 'float', possible loss of data
+         Generating Code...
        Link:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\link.exe /ERRORREPORT:PROMPT /OUT:"D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\Debug\Project-INFO-H-503.exe" /INCREMENTAL /NOLOGO /LIBPATH:"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\lib\Win32" cudart.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\Debug\Project-INFO-H-503.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\Debug\Project-INFO-H-503.lib" /MACHINE:X86 Debug\gpuRegistration.cu.obj
          Debug\main.obj
+         Debug\cpuRegistration.obj
          PROJECT-INFO-H-503.vcxproj -> D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\Debug\Project-INFO-H-503.exe
        PostBuildEvent:
          echo copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\bin\cudart*.dll" "D:\Documents de Corentin\Documents\ULB\MA2\INFO-H-503\Projet\src\Debug\"
@@ -26,4 +39,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:01.06
+Time Elapsed 00:00:16.45
