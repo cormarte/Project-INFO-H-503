@@ -161,6 +161,8 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="cpuRegistration.cpp" />
+    <ClCompile Include="nrutil.cpp" />
+    <ClCompile Include="powell.cpp" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="gpuRegistration.cu" />
@@ -170,6 +172,8 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="cpuRegistration.h" />
     <ClInclude Include="gpuRegistration.h" />
     <ClInclude Include="image.h" />
+    <ClInclude Include="nrutil.h" />
+    <ClInclude Include="powell.h" />
     <ClInclude Include="transform.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

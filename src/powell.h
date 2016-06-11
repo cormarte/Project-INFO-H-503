@@ -1,0 +1,1 @@
+void powell(float* value, float* point, const int n, const float tolerance, float(*function)(float*));

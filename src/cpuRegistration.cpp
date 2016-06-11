@@ -1,4 +1,4 @@
-#define _USE_MATH_DEFINES
+﻿#define _USE_MATH_DEFINES
 
 #include <amp_math.h>
 #include <chrono>
@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "image.h"
+#include "powell.h"
 #include "transform.h"
 
 using namespace Concurrency::fast_math;
@@ -17,14 +18,23 @@ using namespace std;
 #define PI 3.14159265358979f
 typedef int HistogramType;
 
+// Variables
+unsigned int width;
+unsigned int height;
+Image floatingImage;
+Image referenceImage;
+Image transformedImage;
+HistogramType* referenceHistogram;
+HistogramType* transformedHistogram;
+HistogramType* histogram2D;
 
 void cpuApplyTransform(const Image& originalImage, Image& transformedImage, const Transform& transform) {
 
 	float cosrz = cosf(-transform.rz * PI / 180.0f);
 	float sinrz = sinf(-transform.rz * PI / 180.0f);
 
-	int centerX = originalImage.width / 2 - transform.tx;
-	int centerY = originalImage.height / 2 - transform.ty;
+	float centerX = originalImage.width / 2 - transform.tx;
+	float centerY = originalImage.height / 2 - transform.ty;
 
 	for (int y = 0; y != originalImage.height; y++) {
 
@@ -105,90 +115,61 @@ float cpuMutualInformation(const HistogramType* histogram1, const HistogramType*
 }
 
 
-Image cpuRegister(const Image& floatingImage, const Image& referenceImage) {
+float cpuPowellFunction(float* transformVector) {
+
+	/* Calculates the mutual information of the reference image
+	and the transformed image for a transform vector 'transformVector' */
+
+	Transform transform = { transformVector[0], transformVector[1], 0, 0, 0, transformVector[2] };
+
+	//cout << transformVector[0] << ", " << transformVector[1] << ", " << transformVector[2] << endl;
+
+	cpuApplyTransform(floatingImage, transformedImage, transform);
+
+	memset(transformedHistogram, 0, HISTOGRAMSIZE * sizeof(HistogramType));
+	cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(transformedImage, transformedHistogram);
+
+	memset(histogram2D, 0, HISTOGRAMSIZE * HISTOGRAMSIZE * sizeof(HistogramType));
+	cpuHistogram2D<HistogramType, HISTOGRAMSIZE>(transformedImage, referenceImage, histogram2D);
+
+	// Because Powell search is written for minimization of function, MI is multiplied by -1 to search max
+	float mutualInformation = (-1.0f)*cpuMutualInformation<HistogramType, HISTOGRAMSIZE>(transformedHistogram, referenceHistogram, histogram2D, width, height);
+	
+	//cout << -1.0f*mutualInformation << endl;
+	
+	return mutualInformation;
+}
+
+Image cpuRegister(const Image& image1, const Image& image2) {
 
 	// Initialization
-	unsigned int width = referenceImage.width;
-	unsigned int height = referenceImage.height;
-	Image transformedImage = {width, height, new unsigned char[width * height]};
-	HistogramType* referenceHistogram = new HistogramType[HISTOGRAMSIZE];
-	HistogramType* transformedHistogram = new HistogramType[HISTOGRAMSIZE];
-	HistogramType* histogram2D = new HistogramType[HISTOGRAMSIZE * HISTOGRAMSIZE];
-
-	// Registration
-	vector<int> translationsX;
-	vector<int> translationsY;
-	vector<float> rotationsZ;
-
-	for (int i = 0; i != 1; i++) {
-
-		translationsX.push_back(i + 10);
-		translationsY.push_back(i - 20);
-		rotationsZ.push_back(i - 30);
-	}
-
-	Transform optimalTransform = {0, 0, 0, 0, 0, 0};
-	float maxMutualInformation = 0;
+	floatingImage = image1;
+	referenceImage = image2;
+	width = referenceImage.width;
+	height = referenceImage.height;
+	transformedImage = {width, height, new unsigned char[width * height]};
+	referenceHistogram = new HistogramType[HISTOGRAMSIZE];
+	transformedHistogram = new HistogramType[HISTOGRAMSIZE];
+	histogram2D = new HistogramType[HISTOGRAMSIZE * HISTOGRAMSIZE];
 
 	memset(referenceHistogram, 0, HISTOGRAMSIZE * sizeof(HistogramType));
-	//auto begin = chrono::high_resolution_clock::now();
 	cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(referenceImage, referenceHistogram);
-	//auto end = chrono::high_resolution_clock::now();
-	//cout << "cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(referenceImage, referenceHistogram): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
 	
-	memset(transformedHistogram, 0, HISTOGRAMSIZE * sizeof(HistogramType));
-	//begin = chrono::high_resolution_clock::now();
-	cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(floatingImage, transformedHistogram);
-	//end = chrono::high_resolution_clock::now();
-	//cout << "cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(floatingImage, transformedHistogram): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
+	/*memset(transformedHistogram, 0, HISTOGRAMSIZE * sizeof(HistogramType));
+	cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(floatingImage, transformedHistogram);*/
+	
+	// Powell registration
+	float* maxMutualInformation = new float(FLT_MAX);
+	float transformVector[3] = { 0.0f, 0.0f, 0.0f };
+	
+	powell(maxMutualInformation, transformVector, 3, 2.0e-4f, cpuPowellFunction);
+	
+	// Final transform
+	Transform transform = { transformVector[0], transformVector[1], 0, 0, 0, transformVector[2] };
+	cpuApplyTransform(floatingImage, transformedImage, transform);
 
-	for (int a = 0; a != translationsX.size(); a++) {
-
-		for (int b = 0; b != translationsY.size(); b++) {
-
-			for (int c = 0; c != rotationsZ.size(); c++) {
-
-				Transform transform = {translationsX[a], translationsY[b], 0, 0, 0, rotationsZ[c]};
-				//begin = chrono::high_resolution_clock::now();
-				cpuApplyTransform(floatingImage, transformedImage, transform);
-				//end = chrono::high_resolution_clock::now();
-				//cout << "cpuApplyTransform(floatingImage, transformedImage, transform): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
-
-				//memset(transformedHistogram, 0, HISTOGRAMSIZE * sizeof(HistogramType));
-				//begin = chrono::high_resolution_clock::now();
-				//cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(transformedImage, transformedHistogram);
-				//end = chrono::high_resolution_clock::now();
-				//cout << "cpuHistogram1D<HistogramType, HISTOGRAMSIZE>(floatingImage, transformedHistogram): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
-
-				memset(histogram2D, 0, HISTOGRAMSIZE * HISTOGRAMSIZE * sizeof(HistogramType));
-				//begin = chrono::high_resolution_clock::now();
-				cpuHistogram2D<HistogramType, HISTOGRAMSIZE>(transformedImage, referenceImage, histogram2D);
-				//end = chrono::high_resolution_clock::now();
-				//cout << "cpuHistogram2D<HistogramType, HISTOGRAMSIZE>(transformedImage, referenceImage, histogram2D): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
-				
-				//begin = chrono::high_resolution_clock::now();
-				float mutualInformation = cpuMutualInformation<HistogramType, HISTOGRAMSIZE>(transformedHistogram, referenceHistogram, histogram2D, width, height);
-				//end = chrono::high_resolution_clock::now();
-				//cout << "cpuMutualInformation<HistogramType, HISTOGRAMSIZE>(transformedHistogram, referenceHistogram, histogram2D, width, height): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
-
-				cout << "CPU mutual information: " << mutualInformation << endl;
-
-				if (mutualInformation > maxMutualInformation) {
-
-					maxMutualInformation = mutualInformation;
-					optimalTransform = transform;
-				}
-			}
-		}
-	}
-
-	cout << "Optimal transform: Tx: " << optimalTransform.tx << ", Ty: " << optimalTransform.ty << ", Rz: " << optimalTransform.rz << endl;
-
-	//begin = chrono::high_resolution_clock::now();
-	cpuApplyTransform(floatingImage, transformedImage, optimalTransform);
-	//end = chrono::high_resolution_clock::now();
-	//cout << "cpuApplyTransform(floatingImage, transformedImage, optimalTransform): " << chrono::duration_cast<chrono::nanoseconds>(end - begin).count() << "ns" << std::endl;
-
+	cout << "CPU optimal transform: Tx: " << transform.tx << ", Ty: " << transform.ty << ", Rz: " << transform.rz << endl;
+	cout << "CPU max mutual information: " << (-1.0f) * *maxMutualInformation << endl;
 
 	return transformedImage;
 }

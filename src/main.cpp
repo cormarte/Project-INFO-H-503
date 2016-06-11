@@ -36,6 +36,7 @@ int main(int argc, char* argv[]) {
 		Image cpuRegisteredImage = cpuRegister(floatingImage, referenceImage);
 		auto end = chrono::high_resolution_clock::now();
 		cout << "CPU: " << chrono::duration_cast<chrono::microseconds>(end - begin).count() << "us" << std::endl;
+		cout << endl;
 
 		// GPU registration
 		begin = chrono::high_resolution_clock::now();
